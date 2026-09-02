@@ -1,0 +1,34 @@
+[
+  {
+    "label": "调试当前文件",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "program": "${ZED_FILE}",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "console": "integratedTerminal"
+  },
+  {
+    "label": "调试 ch06 测试",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "ch06.test_exercises",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "console": "integratedTerminal"
+  },
+  {
+    "label": "调试 ch05 测试",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "ch05.test_exercises",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "console": "integratedTerminal"
+  },
+  {
+    "label": "调试 ch04 测试",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "ch04.test_exercises",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "console": "integratedTerminal"
+  }
+]
