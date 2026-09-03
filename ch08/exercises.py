@@ -14,6 +14,9 @@
 # 定义 Dog 类:__init__(self, name, age) 存两个实例属性;
 # 方法 bark(self) 返回 f"{self.name}: 汪汪!"
 # 提示:方法都定义在 class 缩进里,第一个参数是 self
+from boost.ch05_tuples import result
+
+
 class Dog:
     # TODO: __init__ 存 name/age;bark 返回 f"{self.name}: 汪汪!"
     def __init__(self , name , age):
@@ -45,7 +48,17 @@ class Counter:
 # 提示:f-string 里的数值直接用 {amount} {self.balance} 插入,消息逐字符照抄
 class BankAccount:
     # TODO: 两个方法各带一个 if 越界 raise,否则增减余额
-    pass
+    def __init__(self,owner,balance=0):
+        self.owner = owner
+        self.balance = balance
+    def deposit(self,amount):
+        if amount <= 0:
+            raise ValueError(f"存款必须为正数: {amount}")
+        self.balance += amount
+    def withdraw(self , amount):
+        if amount > self.balance:
+            raise ValueError(f"余额不足: {self.balance} < {amount}")
+        self.balance -= amount
 
 
 # 练习 4:__repr__
@@ -57,7 +70,9 @@ class Point:
         self.y = y
 
     # TODO: __repr__ 返回 f"Point({self.x!r}, {self.y!r})"
-    pass
+    def __repr__(self):
+        return f"Point({self.x!r}, {self.y!r})"
+    
 
 
 # 练习 5:实例属性 vs 类属性
@@ -67,7 +82,13 @@ class Point:
 # 提示:类属性写在类体里、方法外;describe 里用 self.wheels 就能读到
 class Car:
     # TODO: wheels = 4 写在方法外;__init__ 存 brand;describe 拼字符串
-    pass
+    wheels  = 4
+    
+    def __init__(self , brand):
+        self.brand = brand
+    
+    def describe(self):
+        return f"{self.brand} 有 {self.wheels} 个轮子"
 
 
 # 练习 6:继承与重写
@@ -84,12 +105,21 @@ class Shape:
 
 class Square(Shape):
     # TODO: __init__ 存 side;area 返回 side * side
-    pass
+    def __init__(self, side):
+        self.side = side 
+
+    def area(self):
+        return  self.side * self.side
 
 
 class Circle(Shape):
     # TODO: __init__ 存 r;area 返回 3.14159 * r * r
-    pass
+    def __init__(self , r):
+        self.r = r
+
+    def area(self):
+        return  3.14159 * self.r * self.r
+
 
 
 # 练习 7:super() 扩展 __init__
@@ -104,8 +134,13 @@ class Animal:
 
 class Cat(Animal):
     # TODO: __init__ 先 super().__init__(name) 再存 indoor;speak 返回 "喵~"
-    pass
+    def __init__(self, name, indoor):
+        super().__init__(name)  #把name交给父类处理
+        self.indoor = indoor
 
+    def speak(self):
+        return "喵~"
+    
 
 # 练习 8:鸭子类型(挑战)
 # 写函数 loudest(items):items 是一串对象,要求每个都有 speak() 方法;
@@ -115,8 +150,14 @@ class Cat(Animal):
 #       AttributeError 故意不接——鸭子测试失败就该大声炸(ch07:bug 不接)
 def loudest(items):
     # TODO: 空列表返回 "";循环取 item.speak(),len 最长者胜出
-    pass
-
+    if not items:
+        return ""
+    best  = ""
+    for i in items:
+        result =  i.speak()  #没有直接炸出
+        if len(result) > len(best):
+            best = result
+    return best
 
 # 练习 9:封装实战(README 8.4 的落地)
 # 把 BankAccount 改造成"守门"版:
@@ -124,7 +165,7 @@ def loudest(items):
 #   余额存成受保护属性 self._balance(下划线开头 = "内部用,别碰")
 # balance(self) 方法:返回 self._balance(对外只读的窗口)
 # deposit(self, amount):amount <= 0 时 raise ValueError(f"存款必须为正数: {amount}"),
-#   否则给 self._balance 加 amount
+#   否则给 self._balance 加 a mount
 # withdraw(self, amount):amount > self._balance 时
 #   raise ValueError(f"余额不足: {self._balance} < {amount}"),否则减
 # 想一想(不用写):为什么外面现在改不了余额了?——不是语法拦住了,
@@ -132,4 +173,16 @@ def loudest(items):
 # 提示:和练习 3 只差两处——属性名全部改 _balance、新增 balance() 读窗口
 class SafeAccount:
     # TODO: _balance 受保护属性 + balance() 只读窗口 + 守门的 deposit/withdraw
-    pass
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self._balance = balance 
+    def balance(self):
+        return self._balance
+    def deposit(self, amount):
+        if amount <= 0:
+            raise ValueError(f"存款必须为正数: {amount}")
+        self._balance += amount
+    def withdraw(self, amount):
+        if amount > self._balance:
+            raise ValueError(f"余额不足: {self._balance} < {amount}")   
+        self._balance -= amount

@@ -31,18 +31,18 @@
 | [ch06](ch06.md) | 风格 | 冒号前空格第三次复发（`f :`）+ 逗号后缺空格——仍在 | 代码风格 | ⬜ 待改正 |
 | [ch07](ch07.md) | 练习 3 | `FileExistsError` 应为 `FileNotFoundError`（一字之差意思相反，接不住穿墙） | 异常型号接错 | ✅ 已改正（8/8 通过） |
 | [ch07](ch07.md) | 练习 4 | `score == 100` 应为 `> 100`（满分被误判非法） | 边界条件 | ✅ 已改正（8/8 通过） |
-| [ch07](ch07.md) | 练习 6 | 裸 `except: raise`（想转发却吞 Ctrl+C；转发不需写，自动上传） | 裸 except 违规 | ✅ 已改正（8/8 通过） |
-| [ch07](ch07.md) | 附加 | 幽灵 import 第五次·双幽灵（json.decoder 冗余 + shutil.RegistryError 套娃误选） | 工具习惯 | ✅ 已改正（import 区已清） |
-| [ch07](ch07.md) | 风格 | 冒号前空格**第四章连犯** + 逗号方向反（`path ,"w" ,`） | 代码风格 | ✅ 已改正（8/8 通过） |
+| [ch07](ch07.md) | 练习 6 | 裸 `except: raise`（想转发却吞 Ctrl+C；转发不需写，自动上传） | 裸 except 违规 | ⬜ 待改正（测试可过，代码未删） |
+| [ch07](ch07.md) | 附加 | 幽灵 import 第五次·双幽灵（json.decoder 冗余 + shutil.RegistryError 套娃误选） | 工具习惯 | ⬜ 待改正（import 区未清；勘误：RegistryError 本机真实存在，import 不炸） |
+| [ch07](ch07.md) | 风格 | 冒号前空格**第四章连犯** + 逗号方向反（`path ,"w" ,`） | 代码风格 | ⬜ 待改正（测试不管风格） |
 
 > ch05 无错题记录（学员独立完成，9/9 通过，输出已贴）。
-> ch07 测试 8/8 通过（2026-09-02 贴出），5 条全部 ✅，本章收官。
-> boost/quiz：evens 漏 range、for 少冒号、calendar 幽灵 import 删成半截（未单独建册，详见对话）。
+> ch07 测试 8/8 通过（2026-09-03 Agent 终端实跑核验——终端已修复，无需再贴输出）；功能收官，但双幽灵 import / 裸 except / 风格三处卫生项 ⬜ 仍在。2026-09-02 曾误记 5 条全 ✅，已按盘面改回。
+> boost/quiz：evens 漏 range、for 少冒号、calendar 幽灵 import 删成半截——三处均已改正，2026-09-03 Agent 实跑 100/100 满分核验（未单独建册，详见对话）。
 
 ## 错误类型统计
 
-- 工具习惯（幽灵 import / 编辑器误操作）：**5 次**（sqlite3/winreg/calendar/asyncio/ch07 双幽灵）——前四次已清，第五次已清 ⚠️ 交卷前扫 import 区是固定动作
-- 代码风格：4 次 ⚠️ **冒号前空格连续四章（ch03/ch04/ch06/ch07），ch07 已改但 ch03/ch04/ch06 的仍在**——交卷前全文搜 ` :`
+- 工具习惯（幽灵 import / 编辑器误操作）：**5 次**（sqlite3/winreg/calendar/asyncio/ch07 双幽灵）——前四次已清，第五次 ⬜ 仍在 ⚠️ 交卷前扫 import 区是固定动作
+- 代码风格：4 次 ⚠️ **冒号前空格连续四章（ch03/ch04/ch06/ch07）全部仍在；ch08 练习 1 又见逗号前空格（`self , name`）**——交卷前全文搜 ` :` 和 ` ,`
 - 文件卫生（演示代码混入 / 注释未清）：2 次
 - API 细节：2 次（join 分隔符、ensure_ascii）
 - API 方向混淆：1 次（split/join；json 方向口头反 6 次但**代码全对**，专题已建 boost/ch06_json_direction.py）

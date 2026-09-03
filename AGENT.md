@@ -54,11 +54,11 @@
 
 ## 环境限制（已踩过的坑）
 
-- **Windows 11 + Zed，无 POSIX shell**：Agent 的命令执行工具依赖 `sh`，在本机不可用
-  （`spawn sh ENOENT`，多次验证）。**Agent 无法替学员运行任何命令**，需要运行/验证时：
-  给出确切命令让学员自己执行，再把输出贴回来分析。
-- 写新文件前目录必须已存在（用户提前 mkdir；ch07、boost/quiz 都是用户建的）。
-  **ch08 目录也需要学员提前建**（Agent 无法 mkdir）。
+- ~~Windows 11 + Zed，无 POSIX shell~~ **已过时（2026-09-03）**：终端恢复可用，
+  `python` 可直接跑。**Agent 现在能自己运行/验证命令**（跑测试、出分、演示），
+  学员不再需要贴输出；建目录、写文件也可由 Agent 完成。
+- ~~写新文件前目录必须已存在（用户提前 mkdir）~~ 已过时（2026-09-03 终端恢复后
+  Agent 可自建目录）。ch08/ 已生成全套内容（README + 3 示例 + 练习/测试/答案）。
 - 静态检查用 Pylance/Pyright：避免隐式相对导入。注意 boost/quiz 的 answers.py
   需要 `from . import exercises`（学员答案可能组合复用）。
 - 学员用编辑器自动补全，出现过"幽灵 import"（ch03 sqlite3、ch04 winreg；
@@ -119,7 +119,7 @@
 9. **裸 except 违规**（ch07：`except: raise` 想转发却吞 Ctrl+C——转发不需要写，
    没接住的自动上传）
 
-## 当前进度（更新于 2026-09-02）
+## 当前进度（更新于 2026-09-03）
 
 | 章节 | 状态 | 备注 |
 |------|------|------|
@@ -129,9 +129,9 @@
 | ch04 函数 | 🔥 差小尾巴 | 9/9 通过 ✅；但 exercises.py 末尾的演示代码（area+print）、练习 3 坏注释、风格项仍未清（错题本 ⬜ 4 条） |
 | ch05 数据结构 | ✅ 学员完成 | 9/9 通过，无错题 |
 | ch06 输入输出与文件 | ✅ 测试收官 | 8/8 通过（2026-09-02 贴出）；错题本 3 条 ✅，练习 6 哑门卫（代码未改）与风格项仍 ⬜ |
-| boost/quiz | 🔥 已做未出分 | 三处错误已指出（evens 漏 range、for 少冒号、calendar 半截 import），改后测试输出未贴 |
-| ch07 异常 | 🔥 代码已审，待改+出分 | 学员做完 8 题，代码骨架全对（三铁律/裸 raise 转发/from e/finally 记录仪都对）。**审读发现待改**：① import 区双幽灵（json.decoder+shutil.RegistryError）整行删；② 练习 3 FileExistsError→FileNotFoundError；③ 练习 4 `== 100`→`> 100`；④ 练习 6 删 `except: raise` 块；⑤ 风格：冒号前空格+逗号方向。**测试输出未贴、错题本 ch07.md 未建**（等改完+贴输出后一起落账）。学员追问质量高：调用链 vs 继承树、异常往哪传、except 接不住会怎样、危险行判断、嵌套 raise from 解读——概念已通 |
-| ch08 OOP（类） | ⬜ 待生成 | **下一步**。学员从 Go 迁移，struct+method 对照是天然切入点。目录需学员先建 |
+| boost/quiz | ✅ 满分收官（2026-09-03） | 100/100 由 Agent 实跑确认 🏆；三处错误（evens 漏 range、for 少冒号、calendar 半截 import）均已改正核验 |
+| ch07 异常 | ✅ 功能收官（2026-09-03 核验） | ②③已改正；测试 8/8 由 Agent 实跑确认（终端已修复）。**遗留卫生项 ⬜**：①双幽灵 import、④`except: raise`、⑤风格——测试可过但代码未清。错题本 ch07.md 已建（5 条；其中 3 条曾误记 ✅，已按盘面改回 ⬜ + RegistryError 勘误：本机 shutil 真实存在，import 不炸）。学员追问质量高：调用链 vs 继承树、异常往哪传、except 接不住会怎样、危险行判断、嵌套 raise from 解读——概念已通 |
+| ch08 OOP （类） | 🔥 学员开做（2026-09-03） | 全套已生成（README 8.0-8.11 + 3 示例 + 9 题 + 测试 + 答案；封装两讲 8.3/8.4：打包 + `_` 约定守门）。练习 1-2 已完成（逗号前空格复发），当前卡点=封装属性（`_`/守门/Go 对照已讲）。AGENT.md 原出题方向清单已全覆盖 |
 | ch09–ch10 | ⬜ | 模块包 / 标准库 |
 | ch11 同步与异步 | ⬜ | asyncio 入门，Agent 开发直接前置 |
 | boost/ | ✅ 活跃 | ch05_tuples.py、review_ch01_05.py、quiz/、ch06_json_direction.py、**ch07_危险行判断.py（新）** |
@@ -139,17 +139,14 @@
 
 ## 待办 / 下一步
 
-1. **ch07 收尾（出分前必做）**：学员改 5 处（双幽灵 import 整行删、FileExistsError、
-   `== 100`、`except: raise` 块、风格）→ 贴 `python -m ch07.test_exercises` 输出
-   → Agent 建 `mistakes/ch07.md`（3 条错题 ⬜ + 幽灵 import 第五次 + 风格第四章）
-   并更新 mistakes/README.md 索引。
-2. **ch08 生成（本轮待办）**：OOP。切入点：Go struct+method 对照；
-   出题方向：类定义与 `__init__`、实例属性 vs 类属性、方法即函数、`__str__`/`__repr__`、
-   继承与方法重写、super()、组合优于继承（先组合）、鸭子类型（Go interface 的天然对照）。
-   目录 ch08/ 需学员先建。
+1. ~~ch07 收尾~~ ✅（2026-09-03）：测试已实跑核验 8/8、错题本已建并纠正。
+   遗留：学员随时清三处卫生项（双幽灵 import 整行删、删 `except: raise` 块、风格）。
+2. ~~ch08 生成~~ ✅：全套已生成。**进行中**：学员做练习 3-9（封装属性 `_`/守门
+   已重点讲解，含 Go 对照）；交卷后审读 + 建 mistakes/ch08.md。
+   ⚠️ 学员明确要求（2026-09-03）：**学习期间不要主动跑 ch08 测试**，等学员交卷再测。
 3. **旧账三笔（随时可清）**：ch03 测试输出未贴；ch04 演示代码/坏注释；
    ch06 练习 6 哑门卫 + `f :` 风格。
-4. **quiz 出分**：等 `python -m boost.quiz.test_exercises` 输出。
+4. ~~quiz 出分~~ ✅（2026-09-03）：Agent 实跑 `python -m boost.quiz.test_exercises` → **100/100 满分**，三处错误均已改正核验。
 5. **boost/ 维护**：候选专题：推导式专题、原地vs造新专题
    （ch07_危险行判断.py 已建 2026-09-02）。
 6. 学员薄弱点与讲解偏好：方向混淆（split/join 已治、json 已锚定——代码全对、口头易反，

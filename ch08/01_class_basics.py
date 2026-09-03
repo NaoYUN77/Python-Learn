@@ -8,8 +8,8 @@
 # 第一部分:定义一个类 + 实例化
 # ══════════════════════════════════════════
 
-# 1. 类定义 = 一个打包声明:这类东西有【名字/年龄】这些数据,
-#    会做【叫/birthday】这些事
+# 1. 类定义 = 一张图纸:这类东西有【名字/年龄】这些数据,
+#    会做【叫】这件事
 class Dog:
     def __init__(self, name, age):      # 初始化:造对象时自动调用
         self.name = name                # self.name = 实例属性(挂在这个对象身上)
@@ -18,18 +18,6 @@ class Dog:
     def bark(self):                     # 方法 = 类里的函数,第一个参数永远是 self
         return f"{self.name}: 汪汪!"
 
-#class Dog
-# def __init__(self,name ,age,legs)
-#   self.name = name
-#   self.age = age
-#   self.legs = legs
-# def bark(self):
-#   return f"{self.name}: 汪汪!  {self.age}岁 it has {self.legs} legs"
-# 
-# 
-# d1 = Dog("旺财",3)
-# 
-# 
 # 2. 实例化:类名加括号 = 造一个对象,__init__ 自动执行
 #    (不用传 self!Python 自动把新对象塞进 self)
 d1 = Dog("旺财", 3)
@@ -55,7 +43,7 @@ print(Dog.bark(d1))         # 旺财: 汪汪! ← 和 d1.bark() 一模一样
 d1.age = 4                  # 只改 d1 的
 print(d1.age, d2.age)       # 4 1 ← d2 毫发无损
 
-# 6. 属性不用预先声明,随时可加(动态;Go struct 字段必须先声明,这是差异)
+# 6. 属性不用预先声明,随时可加(动态)
 d1.nickname = "财财"
 print(d1.nickname)          # 财财
 # print(d2.nickname)        # ← AttributeError:d2 没这个属性(ch07 的信号!)
