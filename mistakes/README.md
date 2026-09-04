@@ -34,15 +34,21 @@
 | [ch07](ch07.md) | 练习 6 | 裸 `except: raise`（想转发却吞 Ctrl+C；转发不需写，自动上传） | 裸 except 违规 | ⬜ 待改正（测试可过，代码未删） |
 | [ch07](ch07.md) | 附加 | 幽灵 import 第五次·双幽灵（json.decoder 冗余 + shutil.RegistryError 套娃误选） | 工具习惯 | ⬜ 待改正（import 区未清；勘误：RegistryError 本机真实存在，import 不炸） |
 | [ch07](ch07.md) | 风格 | 冒号前空格**第四章连犯** + 逗号方向反（`path ,"w" ,`） | 代码风格 | ⬜ 待改正（测试不管风格） |
+| [ch08](ch08.md) | 练习 3 | `deposit` 守门 raise 写了，正事没干（漏 `self.balance += amount`） | 守门后遗漏正事 | ✅ 已改正（盘面核验） |
+| [ch08](ch08.md) | 练习 8 | 累加器 `best = ""` 缩进在 for 循环内（每轮清零→最后一个赢） | 循环控制流 | ✅ 已改正（盘面核验） |
+| [ch08](ch08.md) | 练习 9 | 手滑三连：`disposit` 拼写（笔误史+1）+ `self.amount += self._balance`（幽灵属性+方向反）+ 漏 withdraw 扣款行 | 手滑 / 方向反 | ✅ 已改正（盘面核验） |
+| [ch08](ch08.md) | 附加 | 幽灵 import 第六次（`from boost.ch05_tuples import result`——未用且 import 即执行 boost 顶层演示，**首次带副作用**） | 工具习惯 | ⬜ 待改正（L17 仍在，整行删） |
+| [ch08](ch08.md) | 风格 | 逗号前空格复发（`self , name , age` 等）+ `wheels  = 4` 双空格 | 代码风格 | ⬜ 待改正 |
 
 > ch05 无错题记录（学员独立完成，9/9 通过，输出已贴）。
 > ch07 测试 8/8 通过（2026-09-03 Agent 终端实跑核验——终端已修复，无需再贴输出）；功能收官，但双幽灵 import / 裸 except / 风格三处卫生项 ⬜ 仍在。2026-09-02 曾误记 5 条全 ✅，已按盘面改回。
 > boost/quiz：evens 漏 range、for 少冒号、calendar 幽灵 import 删成半截——三处均已改正，2026-09-03 Agent 实跑 100/100 满分核验（未单独建册，详见对话）。
+> ch08：代码错误三笔（练习 3/8/9）均已改正（2026-09-03 盘面核验，Agent 未跑测试——等卫生项清完再复核）；幽灵 import 第六次（L17，首次带副作用）+ 逗号前空格复发 ⬜ 待清。
 
 ## 错误类型统计
 
-- 工具习惯（幽灵 import / 编辑器误操作）：**5 次**（sqlite3/winreg/calendar/asyncio/ch07 双幽灵）——前四次已清，第五次 ⬜ 仍在 ⚠️ 交卷前扫 import 区是固定动作
-- 代码风格：4 次 ⚠️ **冒号前空格连续四章（ch03/ch04/ch06/ch07）全部仍在；ch08 练习 1 又见逗号前空格（`self , name`）**——交卷前全文搜 ` :` 和 ` ,`
+- 工具习惯（幽灵 import / 编辑器误操作）：**6 次**（sqlite3/winreg/calendar/asyncio/ch07 双幽灵/ch08 boost 套娃）——前五次已清，第六次 ⬜ 仍在 ⚠️ 交卷前扫 import 区是固定动作
+- 代码风格：5 次 ⚠️ **冒号前空格连续四章（ch03/ch04/ch06/ch07）全部仍在；ch08 逗号前空格复发（`self , name , age`，⬜）**——交卷前全文搜 ` :` 和 ` ,`
 - 文件卫生（演示代码混入 / 注释未清）：2 次
 - API 细节：2 次（join 分隔符、ensure_ascii）
 - API 方向混淆：1 次（split/join；json 方向口头反 6 次但**代码全对**，专题已建 boost/ch06_json_direction.py）
@@ -50,8 +56,10 @@
 - 边界条件：1 次（`== 100` 应为 `> 100`，ch07）✅
 - 裸 except 违规：1 次（`except: raise`，ch07）✅
 - 格式化细节：1 次（:02d 位数=下限）✅
+- 守门后遗漏正事：1 次（ch08 deposit 只 raise 不加钱）✅——raise 拦的是坏人，门里还要办正事
+- 手滑/方向反：1 次（ch08 练习 9 三连：disposit 拼写 / self.amount 幽灵属性+方向反 / 漏扣款行）✅（笔误史：fist/itme/test/_name_/disposit）
 - 模式误迁移：1 次（哑门卫，待改）
-- 循环控制流：1 次
+- 循环控制流：2 次（ch03 过早 return ✅；ch08 累加器循环内清零 ✅——同族病：缩进决定"每轮重来"还是"全程累计"）
 - 类型误用 / 索引概念：1 次
 
 > 由 AI 助手在每次练习审读后同步更新。
