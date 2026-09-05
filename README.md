@@ -23,11 +23,18 @@
 | ch05 | 数据结构：列表、元组、集合、字典、推导式 | ✅ 已完成 |
 | ch06 | 输入输出与文件：print/input、with、json | ✅ 已完成 |
 | ch07 | 错误与异常 | ✅ 已完成 |
+<<<<<<< HEAD
 | ch08 | 类与面向对象编程 | 🔥 收尾中 |
 | ch09 | 模块与包 | 🔥 学员开做中 |
 | ch10 | 标准库漫游 + 常用第三方库（pydantic/requests/httpx…） | 🔥 内容就绪 |
 | ch11 | 同步与异步编程（asyncio，为 Agent 开发打基础） | 🔥 内容就绪 |
 | ch12 | Agent 开发入门（Agent Loop、pydantic、pydantic-ai） | 🔥 内容就绪 |
+=======
+| ch08 | 类与面向对象编程 | ✅ 已完成 |
+| ch09 | 模块与包 | 进行中 |
+| ch10 | 标准库常用模块 | ⬜ |
+| ch11 | 同步与异步编程（asyncio 入门，为 Agent 开发打基础） | ⬜ |
+>>>>>>> 49097b94a473541d497f32ae4e7cce82e54f2896
 
 > 学完基础章节后，ch11（异步）是 Agent 开发的直接前置；
 > ch10 的 pydantic 和 ch12 的 pydantic-ai 是 Agent 开发主线。
