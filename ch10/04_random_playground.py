@@ -1,4 +1,4 @@
-"""04_random_playground.py — random 游乐场 — 随机,但可复现。
+"""04_random_playground.py — random 游乐场:随机,但可复现。
 
 运行:python ch10/04_random_playground.py
 看点:上半段每次跑都不一样(这才叫随机),

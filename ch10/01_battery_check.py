@@ -1,4 +1,4 @@
-"""01 工具带盘点 — 你早就在用标准库了。
+"""01_battery_check.py — 工具带盘点:你早就在用标准库了。
 
 运行:python ch10/01_battery_check.py
 两个看点:

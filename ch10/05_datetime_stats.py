@@ -2,7 +2,7 @@
 
 运行:python ch10/05_datetime_stats.py
 第 1 段的"今天"以你跑的那天为准。
-README 对照:10.4 / 10.5
+README 对照:10.5
 """
 
 from datetime import date, timedelta

@@ -50,7 +50,7 @@ try:
         City(name="杭州", population="很多")  # str 转不成 int
     except Exception as e:
         print(f"    乱来的数据?挡下:{type(e).__name__}")
-    print("    → LLM 回来的 JSON 结构对不对,靠它把关(Agent 开发刚需)")
+    print("    → LLM 回来的 JSON 结构对不对,靠它把关(Agent 开发刚需,ch12 主角)")
 except ImportError:
     print("    ⬜ 未安装。装:pip install pydantic")
 

@@ -1,4 +1,4 @@
-"""06_regex_intro.py — re 三板斧 — findall / search / sub。
+"""06_regex_intro.py — re 三板斧:findall / search / sub。
 
 运行:python ch10/06_regex_intro.py
 正则 = 用一行模式描述"长什么样的文本"。输出全部确定,可对照。

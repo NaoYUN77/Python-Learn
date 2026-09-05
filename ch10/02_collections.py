@@ -1,7 +1,7 @@
 """02_collections.py — collections 漫游:Counter / defaultdict / deque
 
 运行:python ch10/02_collections.py
-README 对照:10.1
+README 对照:10.2
 """
 
 from collections import Counter, defaultdict, deque
@@ -27,3 +27,4 @@ line = deque(["甲", "乙", "丙"])
 line.append("丁")                # 队尾进
 first = line.popleft()           # 队头出(瞬间完成;list.pop(0) 要搬全家当)
 print(first, list(line))         # 甲 ['乙', '丙', '丁']
+# (预告:Agent 框架的"消息历史"经常就是 deque——ch12 会见)

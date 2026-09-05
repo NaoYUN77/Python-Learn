@@ -1,64 +1,93 @@
 """answers.py — 第十一章练习参考答案。
 
 先自己做完 exercises.py,再对照这里。
+演示:python -m ch11.answers(点火台里会并发调三个"工具"给你看)
 """
-
-from collections import Counter, defaultdict
-from datetime import date
-from pathlib import Path
-from string import ascii_letters, digits
-import random
-import statistics
+import asyncio
 
 
-# 练习 1:三步一行流
-def most_common_words(text, n):
-    counts = Counter(text.split())
-    return counts.most_common(n)
+# 练习 1:只加一个词——async。调用返回协程对象(票),await 兑票才执行
+async def make_tea():
+    return "🍵 茶泡好了"
 
 
-# 练习 2:缺键工厂接手收集模式
-def group_by_first_letter(words):
-    groups = defaultdict(list)
-    for w in words:
-        groups[w[0]].append(w)      # 缺键自动建空列表,append 就完了
-    return dict(groups)             # 转回普通 dict
+# 练习 2:await asyncio.sleep 让位;time.sleep 是站桩,协程里禁用
+async def nap(seconds):
+    await asyncio.sleep(seconds)
+    return f"睡了 {seconds} 秒"
 
 
-# 练习 3:randint 两端都含
-def roll_dice(n):
-    return [random.randint(1, 6) for _ in range(n)]
+# 练习 3:积木相同,拼法不同——排队 vs 同时点火
+async def boil(name, seconds):
+    await asyncio.sleep(seconds)
+    return f"{name} 的开水"
 
 
-# 练习 4:glob 给 Path,要的是文件名
-def py_files_in(folder):
-    return sorted([p.name for p in Path(folder).glob("*.py")])
+async def boil_serial(durations):
+    results = []
+    for i, d in enumerate(durations, start=1):      # ch05 的 enumerate:i 从 1 数起
+        results.append(await boil(f"壶{i}", d))     # 等一壶好,下一壶才上灶
+    return results
 
 
-# 练习 5:date 相减得 timedelta
-def days_between(y1, m1, d1, y2, m2, d2):
-    return (date(y2, m2, d2) - date(y1, m1, d1)).days
+async def boil_gather(durations):
+    tickets = [boil(f"壶{i}", d) for i, d in enumerate(durations, start=1)]
+    return await asyncio.gather(*tickets)           # ch04 的 * 解包:一次交 N 张票
 
 
-# 练习 6:两个统计量,逗号打包成元组
-def exam_stats(scores):
-    return statistics.mean(scores), statistics.median(scores)
+# 练习 4:顺序铁律——gather 的结果按传入顺序排,先完成的不能插队
+async def fetch_all(sites):
+    async def fetch(name, seconds):                 # 协程函数也能定义在函数里
+        await asyncio.sleep(seconds)                # (ch04 闭包的地盘)
+        return f"{name} 下载完成"
+
+    return await asyncio.gather(*[fetch(name, s) for name, s in sites])
 
 
-# 练习 7:材料库 + choice 抽签 + join 缝合
-def gen_password(n):
-    pool = ascii_letters + digits
-    return "".join(random.choice(pool) for _ in range(n))
+# 练习 5:create_task 提前点火——切菜的 0.05s 填进炖汤的 0.2s 里
+async def stew():
+    await asyncio.sleep(0.2)
+    return "汤炖好了"
+
+
+async def cook_dinner():
+    soup_task = asyncio.create_task(stew())   # ① 点火!不 await,先走人
+    await asyncio.sleep(0.05)                 # ② 自己去切菜(汤在炖)
+    dish = "菜切好了"
+    soup = await soup_task                    # ③ 回来收汤
+    return (dish, soup)                       # 逗号打包成元组(ch04)
+
+
+# 练习 6:>100 才炸(100 度是边界,算正常);return_exceptions 让异常不连坐
+async def check_oven(temp):
+    if temp > 100:
+        raise ValueError(f"{temp} 度太高了!")
+    await asyncio.sleep(0.02)
+    return f"{temp} 度正常"
+
+
+async def safe_check(temps):
+    return await asyncio.gather(
+        *[check_oven(t) for t in temps],
+        return_exceptions=True,               # 炸的收成异常对象,一个不落
+    )
+
+
+# 练习 7:迷你 Agent——工具调用全是"睡一会儿再返回",gather 并发收齐
+async def run_tools(tools):
+    async def call(name, seconds):
+        await asyncio.sleep(seconds)          # 真实场景:这里 await 的是网络请求
+        return f"{name} 查询完成"
+
+    return await asyncio.gather(*[call(n, s) for n, s in tools.items()])
 
 
 if __name__ == "__main__":
-    print(most_common_words("py go py go go cat", 2))    # [('go', 3), ('py', 2)]
-    print(group_by_first_letter(["apple", "banana", "avocado"]))
-    # {'a': ['apple', 'avocado'], 'b': ['banana']}
-    random.seed(42)
-    print(roll_dice(3))                                  # 同一种子,输出确定
-    print(py_files_in("."))                              # 当前目录的 .py 文件名
-    print(days_between(2026, 1, 1, 2026, 2, 1))          # 31
-    print(exam_stats([2, 4, 4, 10]))                     # (5.0, 4.0)
-    random.seed(7)
-    print(gen_password(8))                               # 某个 8 位密码(确定)
+    # 演示:并发调三个"工具",总耗时 ≈ 最慢的 0.1s,而不是总和 0.18s
+    import time
+
+    t0 = time.perf_counter()
+    results = asyncio.run(run_tools({"天气": 0.06, "计算": 0.02, "新闻": 0.1}))
+    print(f"工具结果(按传入顺序):{results}")
+    print(f"总耗时 {time.perf_counter() - t0:.2f} 秒"
+          f" —— ≈ 最慢的新闻(0.1s),不是总和 0.18s 🎉")

@@ -1,397 +1,455 @@
-# ch11 标准库漫游 + 电池库大盘点
+# ch11 同步与异步编程:asyncio 入门
 
-> 官方教程:[10. 标准库概览](https://docs.python.org/zh-cn/3/tutorial/stdlib.html) | [11. 标准库概览(续)](https://docs.python.org/zh-cn/3/tutorial/stdlib2.html)
-> 运行示例(项目根目录):`python ch11/02_collections.py`
+> 官方文档:[asyncio — 异步 IO](https://docs.python.org/zh-cn/3/library/asyncio.html) ·
+> 官方教程暂无 async 章,可读 [Real Python: Async IO](https://realpython.com/async-io-python/)(英文)
+> 运行示例(项目根目录):`python ch11/01_sync_vs_async.py`(全部零依赖,直接跑)
 
 ## 11.0 为什么要学这个
 
-ch09 你拿到了"进入标准库的钥匙"(import 三姿势 + 模块对象),
-本章用它去真正逛一逛这座**自带电池**的仓库:
-不用安装、import 就能用,而且**质量比随手手写的高得多**。
+真实世界的大量时间不是花在"计算"上,而是花在**等待**上:
+等网络响应、等数据库返回、等文件读盘——LLM API 一次调用动辄几秒。
 
-漫游的心法只有三条:
+同步代码在等待时**寸步难行**;异步代码在等待时**转身去干别的**。
+ch12 的 Agent 框架里,同时调三个工具、流式接收模型输出,全是 async 的地盘。
+**本章目标:看懂 async 代码 + 会写简单的并发程序**,不求一步登天。
 
-1. **漫游不是背诵**——记住"标准库里大概有什么",忘了"怎么用"就查文档
-2. **每到一个景点,先问连接**——它替你手写过哪个模式?(Counter ↔ ch05 计数)
-3. **import 区三查铁律继续生效**——幽灵七连的账还挂着(9.7 的仪式)
+本章术语先亮出来(后面反复出现):
 
-本章路线图:五个标准库景点 → 正则 → 测速 → 第三方库盘点。
-(Agent 开发库不在这章——ch12 专门讲,pydantic 在那章是主角。)
+| 术语 | 一句话 |
+|------|--------|
+| 同步 | 一行干完等结果,再下一行——**排队等水开** |
+| 异步 | 等的时候先去干别的——**水开之前切菜** |
+| 协程函数 | `async def` 定义的函数——调用它**不执行**,只发一张"票" |
+| 协程对象 | 调用协程函数得到的"票"——`await` 它(或包成 Task)才真正执行 |
+| Task | `create_task` 提前点火的票:立刻排班,可随时查进度、收结果 |
+| Future | 异步操作结果的**占位对象**:PENDING→被 set_result 填入→DONE;Task 是它的子类(11.8) |
+| 可等待对象 | `await` 后面能接的东西:协程对象、Task、Future——都实现了 `__await__`(11.7) |
+| `await` | "这里要等,先让出控制权"——协程的暂停点,顺便收结果 ⚠️简化版,精确版见 11.7 |
+| 事件循环 | 调度员:盯着所有任务,谁不等了就轮到谁 |
+| 并发 | 同一时间段交替推进多个任务(单核也能) |
+| 并行 | 同一时刻真的同时执行(要多核) |
 
-| 景点 | 模块 | 一句话 | 和旧知识的连接 |
-|------|------|--------|----------------|
-| 工具带盘点 | 多个 | 你早就在用标准库了 | ch01–ch09 全部 |
-| 计数与收集 | collections | 手写模式的一行版 | ch05 计数/收集模式 |
-| 文件系统 | pathlib | 路径是对象,`/` 能拼路 | ch06 文件三步 |
-| 随机世界 | random | 随机 ≠ 不可控,seed 是钥匙 | ch03 循环造数据 |
-| 日期时间 + 统计 | datetime / statistics | 日期是对象;统计一行出数 | ch09 闰年题 |
-| 正则入门 | re | 一行模式描述"长什么样的文本" | ch06 字符串处理 |
-| 测速 | timeit | 别猜,要测 | ch05 集合的伏笔 |
-| 第三方库 | pip 装的 | 自带电池之外的外接电池 | 本章新内容 |
+## 11.1 心智模型:煮两壶水(01)
 
-## 11.1 开场:你早就在用标准库了(01)
+同步 vs 异步,用"煮两壶水,每壶要 2 秒(演示尺度),煮开后还要倒水 0.5 秒"来演:
 
-`01_battery_check.py` 先盘一遍工具带:json、math、string、datetime、
-collections、sys——**6 个老朋友**都现场演示一手。
-再当场演示 sys.modules 记账本变厚(ch09 9.1 的知识落地)。
+**同步版时间线**(01 示例上半段):
 
-## 11.2 collections:你手写过的,它都写好了(02)
-
-### Counter:ch05 计数模式的一行版
-
-ch05 你手写:`counts[ch] = counts.get(ch, 0) + 1`。
-标准库把这个模式直接做成了类:
-
-```python
-from collections import Counter
-counts = Counter("abracadabra")
-print(counts)                # Counter({'a': 5, 'b': 2, 'r': 2, 'c': 1, 'd': 1})
-print(counts.most_common(2)) # [('a', 5), ('b', 2)] ← 次数从多到少的热词榜
-print(counts["z"])           # 0 ← 缺键不炸!普通 dict 这里会 KeyError
+```
+煮水1 ████████(等2s) 倒水1 ████(0.5s) 煮水2 ████████(等2s) 倒水2 ████
+总耗时:5.0 秒 —— 等水开的 4 秒里,你干站着
 ```
 
-三个细节:
-- Counter 是 dict 的**子类**(ch08 的话术:"是一种" dict)
-- `most_common(n)` 返回 `[(元素, 次数), ...]` 列表,已经按次数排好序
-- 查不存在的键返回 0 而不是炸——为计数量身定做
+**异步版时间线**(01 示例下半段):
 
-### defaultdict:缺键自动建值的 dict
-
-ch05 收集模式你手写:`groups.setdefault(w[0], []).append(w)`。
-defaultdict 的思路:**先把"缺键时的默认值"设成规矩**,之后只管用:
-
-```python
-from collections import defaultdict
-groups = defaultdict(list)      # 缺键 → 自动调 list() 造空列表
-for w in ["apple", "banana", "avocado"]:
-    groups[w[0]].append(w)      # 不用 setdefault 了,直接 append
-print(dict(groups))             # {'a': ['apple', 'avocado'], 'b': ['banana']}
+```
+煮水1 ████████
+煮水2 ████████     ← 两壶同时煮!
+倒水1 ████ 倒水2 ████
+总耗时:3.0 秒 —— 等水开的时候,另一壶也在烧
 ```
 
-`defaultdict(list)` 读作"一个值默认是空列表的字典"——括号里放什么类型,
-缺键就自动造什么,所以叫**缺键工厂**。
+省下的 2 秒 = **等待时间被重叠了**。计算本身没有变快(倒水还是要 1 秒总量),
+快的是"等待被填满"。这就是异步的全部价值:**等网络/磁盘时别闲着**。
 
-### deque:两头都能进出的队列(认个脸即可)
+什么活适合异步?**I/O 密集**(网络请求、读文件)。
+什么活不适合?**CPU 密集**(大循环算数)——那是多进程的地盘,本章不展开。
 
-```python
-from collections import deque
-line = deque(["甲", "乙", "丙"])
-line.append("丁")          # 队尾进
-first = line.popleft()     # 队头出——瞬间完成
-print(first, list(line))   # 甲 ['乙', '丙', '丁']
-```
+## 11.2 三件套:async def / await / asyncio.run(02)
 
-`list.pop(0)` 每次要把后面全部元素往前搬一遍;`popleft()` 不用。
-排队、任务列表这类"先进先出"场景直接上 deque,用到再深究。
-(预告:Agent 框架的"消息历史"经常就是 deque——ch12 会见。)
-
-### 对照表:手写模式 → 标准库一行版
-
-| 你在 ch05 手写的 | 标准库一行版 |
-|------------------|--------------|
-| `counts[ch] = counts.get(ch, 0) + 1` | `Counter(data)` |
-| `groups.setdefault(k, []).append(x)` | `defaultdict(list)` 后直接 append |
-
-## 11.3 pathlib:路径从字符串变对象(03)
-
-ch06 你用字符串拼路径、`open(path)` 开文件。pathlib 把路径变成**对象**:
+### async def:定义协程
 
 ```python
-from pathlib import Path
-me = Path(__file__)          # 本文件自己的路径(是个对象!)
-print(me.name)               # 03_filesystem.py   ← 文件名
-print(me.stem)               # 03_filesystem      ← 去掉扩展名
-print(me.suffix)             # .py                ← 扩展名
-print(me.parent)             # .../ch11           ← 所在文件夹
+async def boil(name, seconds):
+    print(f"{name}: 开始煮")
+    await asyncio.sleep(seconds)      # 等待点
+    print(f"{name}: 水开了!")
+    return f"{name} 的开水"
 ```
 
-### `/` 运算符拼路径
+- `async def` 定义的函数叫**协程函数(coroutine function)**——调用它**不会执行**,而是返回一个"协程对象"(一张任务票)
+
+**两个词先分清**(本章地基,02 示例会用 type() 亲眼验证):
+
+| 名字 | 是什么 | 怎么得到 |
+|---|---|---|
+| **协程函数**<br>(coroutine function) | `async def` 定义的函数,相当于一张"菜谱" | `async def boil(): ...` 写出来就有 |
+| **协程对象**<br>(coroutine object) | 调用协程函数发出来的"任务票" | `boil("壶1", 2)` 这样调用就发一张 |
+
+极慢镜头:调用的那一瞬间发生了什么——
 
 ```python
-from pathlib import Path
-here = Path(__file__).parent
-box = here / "_temp_box"     # 用 / 拼路径!Windows 自动给 \,Mac/Linux 给 /
-box.mkdir(exist_ok=True)     # exist_ok=True:已存在也不炸(不然 FileExistsError,ch07 老朋友)
-print(box.exists())          # True
-box.rmdir()                  # 只能删空文件夹
-print(box.exists())          # False
+async def boil(name, seconds):   # ← 定义:写下菜谱(函数体一行没跑)
+    ...
+
+coro = boil("壶1", 2)            # ← 调用:【不执行函数体!】只发一张票
+type(coro)    # <class 'coroutine'>        ← 票的类型就叫 coroutine
+coro          # <coroutine object boil at 0x...>
 ```
 
-### 按模式找文件:glob
+- 函数体想跑,票必须被"兑"——两条兑票路:`await coro`,或 `asyncio.create_task(coro)`(11.5)
+- **票是一次性的**:一个协程对象只能被 await 一次,兑第二次直接
+  `RuntimeError: cannot reuse already awaited coroutine`。要再跑,重新调用再造新票
+- **新手第一大坑**:光调用不兑票,Python 会当场提醒
+  `RuntimeWarning: coroutine 'boil' was never awaited`——票作废了,活儿根本没干
+
+### await:在等待点让出控制权
 
 ```python
-from pathlib import Path
-here = Path(__file__).parent
-for p in sorted(here.glob("*.py")):   # *.py = 所有 .py 文件(通配符,ch06 见过)
-    print(p.name)
+result = await boil("壶1", 2)
 ```
 
-03 示例会真的列出本章全部 .py 文件——路径对象 + glob,一屏看全。
+- `await` 做三件事:① 执行这个协程 ② **在它等待时让出控制权**(别人可以插进来跑) ③ 等它完成后**取回返回值**
+  ⚠️ ② 是简化说法——让位的前提是**链条深处真的有等待**;没有的话它一口气跑到底。精确版见 11.7
+- ⚠️ `await` 只能写在 `async def` 函数内部——不能在普通函数里用
 
-### read_text / write_text:小文件的便捷门
+### asyncio.run:点火(入口)
 
 ```python
-from pathlib import Path
-p = Path("笔记.txt")
-p.write_text("你好,标准库!", encoding="utf-8")
-print(p.read_text(encoding="utf-8"))    # 你好,标准库!
+asyncio.run(main())     # 程序入口:启动事件循环,跑完 main 再收摊
 ```
 
-两行顶 ch06 的 open → 读写 → close。**小文件随手用;
-大文件、要逐行处理的,仍走 with open**——别把便捷门当正门。
+整个程序**只需要一个** `asyncio.run`,通常套在 `if __name__ == "__main__":` 里
+(ch09 的守卫!)。它是同步世界通往异步世界的唯一大门。
 
-## 11.4 random:随机不等于不可控(04)
+### 一张图记住三件套
 
-### 五件套
+```
+asyncio.run(main())          ← 点火(整个程序一次)
+ └─ main() 里:await boil()   ← await 处让出控制权
+     └─ async def boil()     ← 协程本体(能暂停/续跑的函数)
+     └─ create_task(coro)    ← 也可提前点火,拿到 Task(11.5)
+```
 
-| 函数 | 干什么 | 注意 |
-|------|--------|------|
-| `randint(a, b)` | a~b 随机整数 | **两端都含!**和 range(含头不含尾)正好相反 |
-| `choice(seq)` | 随机挑一个 | 空序列 → IndexError |
-| `sample(seq, k)` | 抽 k 个,不重复 | **不动原件**,返回新列表 |
-| `shuffle(seq)` | 原地打乱 | **返回 None**(sort 同族坑!),要结果用 sample |
-| `random()` | [0, 1) 随机小数 | 概率模拟的原料 |
+### 老规矩对照:sync 函数 vs async 函数
 
-`randint(1, 6)` 想要 1~6 就写 1 和 6,**含头也含尾**——
-新手第一大坑:和 range 记反了,写成 `randint(1, 5)` 会永远掷不出 6。
-边界条件,盯紧。
+| | 普通函数 | 协程 |
+|---|---|---|
+| 定义 | `def f():` | `async def f():` |
+| 调用 | 立刻执行 | 返回协程对象(票) |
+| 拿结果 | 直接拿到 | 必须 `await` 才执行+拿到 |
+| 内部暂停 | 不可能 | `await` 处可以暂停 |
 
-### seed:让"随机"可复现
+## 11.3 事件循环:调度员在干什么
+
+`asyncio.run` 背后站着**事件循环(event loop)**——整个异步世界的调度员。它的工作循环:
+
+1. 看看**谁在等**(sleep 中、等网络中)→ 先不管
+2. 找一个**能跑的**任务 → 跑到它**真正挂起**为止
+   (不是"下一个 await"!await 只是接力,只有链条深处冒出还没完成的
+   Future 才真挂起——精确版见 11.7)
+3. 谁等完了(水开了)→ 标记为"能跑"
+4. 回到 1,直到所有任务干完
+
+关键认知:**同一时刻只有一行代码在跑**(单线程!),异步不是"同时干"而是
+"**等的时候换人干**"。所以:
+
+- 协程之间**不需要锁**来抢数据(不会真的同时改一个东西)——比多线程省心
+- 协程里写**死循环不 sleep** 会卡死整个调度员(它只有一个人)
+- `time.sleep(2)` 是同步的"站桩等"——协程里**必须用 `await asyncio.sleep(2)`**,
+  前者等的时候不让位,后者等的时候让位。这是第二大坑!
+  (为什么 asyncio.sleep 能让位?它内部有个"真等待"的定时器——精确机制见 11.7)
+
+## 11.4 并发:gather 同发多票(03)
+
+顺序 await 多个协程,还是排队(总时长 = 各任务之和);**gather 才是并发**:
 
 ```python
-import random
-random.seed(42)                              # 定住随机源
-a = [random.randint(1, 6) for _ in range(3)]
-random.seed(42)                              # 再定一次
-b = [random.randint(1, 6) for _ in range(3)]
-print(a, b)      # 两次完全一样!同一种子 → 同一序列
+import asyncio
+
+async def main():
+    # 三张票一起交给调度员,等全部完成,结果按传入顺序排列
+    results = await asyncio.gather(
+        boil("壶1", 2),
+        boil("壶2", 2),
+        boil("壶3", 2),
+    )
+    print(results)      # ['壶1 的开水', '壶2 的开水', '壶3 的开水']
+
+asyncio.run(main())
 ```
 
-**同一种子 → 同一序列**。这把钥匙解决两个大问题:
+- `gather` 把多个协程**同时开跑**,自己也是一个可 await 的对象
+- 等到**全部完成**才放行;返回值列表**按传入顺序**(与完成先后无关)
+- 总耗时 ≈ **最长那个任务**(03 示例实测:三个 2 秒任务,gather 约 2 秒 vs 顺序 await 约 6 秒)
 
-- 测试:测试里 seed 一下,随机函数的结果就能断言了(练习 3 就这么测)
-- 调试:bug 在随机场景出现,seed 定住现场,一步一步复现
+**跟踪表**(03 示例会真打印):
 
-## 11.5 datetime:日期是对象,能加减能比较(05)
+| 时刻 | 调度员视角 |
+|---|---|
+| t=0 | 壶1 开煮 → 遇 await 睡 → 让位;壶2 开煮 → 让位;壶3 开煮 → 让位 |
+| t=0~2 | 三个都在"等水开",调度员闲转 |
+| t=2 | 三壶同时"水开",挨个醒来打水平 |
+| 收工 | gather 把三个返回值按传入顺序打包 |
 
-三兄弟:
+### gather 的兄弟:as_completed(完成一个收一个)
 
-| 类型 | 装 what | 例 |
-|------|---------|-----|
-| `date` | 年月日 | `date(2026, 9, 4)` |
-| `datetime` | 年月日 + 时分秒 | `datetime.now()` |
-| `timedelta` | 时间差 | `timedelta(days=100)` |
+`gather` 是"全部干完一起交卷";`asyncio.as_completed` 是**谁先完成先收谁的**——
+适合"多个网络请求,谁先回来先处理"(Agent 并发调多个工具的写法)。认个脸,用到再学。
 
-### 相减得差,相加得新
+## 11.5 Task:把票提前塞给调度员(04)
+
+`gather` 是"一口气 N 张票同时开工,原地等收工";
+**Task 更自由:单张票提前点火,你去干别的,回头再收**:
 
 ```python
-from datetime import date, timedelta
-today = date.today()
-new_year = date(2027, 1, 1)
-gap = new_year - today                # date − date → timedelta
-print(gap.days)                       # 距 2027 元旦多少天
-print(today + timedelta(days=100))    # 100 天后是哪天
+async def main():
+    soup_task = asyncio.create_task(stew())   # ① 点火!汤立刻排班开炖
+                                              #   (不等待,create 完就返回一个 Task)
+    dish = await cut_veg()                    # ② 你去切菜——汤的等待被你填上了
+    soup = await soup_task                    # ③ 回来收汤:大概率已经炖好了
 ```
 
-ch09 的闰年题(date 相减算天数)你已经用过一次——当时是尝鲜,现在正式学。
+- `create_task(coro)` 收一张**协程对象**,立刻塞进调度员的日程表,返回一个 **Task**;
+  事件循环一有空隙(主流程一 await)就开跑它——04 示例的时间线会亲眼看到这一幕
+- **Task 也是可等待对象**:`await task` 收结果;还能 `task.done()` 查干完没、
+  `task.result()` 取结果(没干完会等)
+- Task 内部有状态:点火后 pending(进行中),干完变 done——`done()/result()` 查的就是它
+  (这套状态就是 11.8 的 Future 盒子状态——Task 是 Future 的子类)
+- ⚠️ `create_task` 必须在**运行中的事件循环里**调用(写在 async def 里就对了);
+  在普通函数里调它会报错——调度员还没上班,你把票塞给谁?
+- 对照记忆:`await coro` = 站在灶前等它做完;`create_task(coro)` = 把锅点上火就走人。
+  gather 底层干的也是"把每张票包成 Task"——所以 11.4 你其实已经用过它了
 
-### 方向题:strftime 出,strptime 进
-
-和 json 四兄弟同一个方向梗(dump 出 / load 进):
-
-| 函数 | 方向 | 原料 → 产物 |
-|------|------|-------------|
-| `d.strftime("%Y-%m-%d")` | **日期 → 字符串**(format,出去给人看) | date → "2026-09-04" |
-| `datetime.strptime(s, "%Y-%m-%d")` | **字符串 → 日期**(parse,进来做计算) | "2026-09-04" → date |
-
-常用格式码:`%Y` 四位年、`%m` 两位月、`%d` 两位日、`%H:%M` 时:分。
-**自动补零**:`strftime("%m")` 给 9 月出 "09"——ch06 的"补零位数=下限"这里免费送。
-
-### statistics:一行出统计
+## 11.6 异常与超时:异步世界的 ch07(05)
 
 ```python
-import statistics
-scores = [88, 92, 79, 93, 85]
-statistics.mean(scores)      # 87.4   平均
-statistics.median(scores)    # 88     中位数(偶数个取中间两数的平均)
-statistics.mode(scores)      # 众数
-statistics.stdev(scores)     # 标准差(波动多大)
+async def risky():
+    await asyncio.sleep(0.5)
+    raise ValueError("网络炸了")
+
+async def main():
+    try:
+        await risky()
+    except ValueError as e:                 # 型号照旧按 ch07 接!
+        print(f"接住:{e}")
 ```
 
-为什么不手写?**边界处理人家都文档化了**:空列表直接抛
-`StatisticsError`(ch07:标准库也按型号抛异常,文档的 Raises 段
-就是危险行清单)——手写的话,这些坑得自己踩一遍。
+try/except 语法**一字不变**——异常照常沿 await 链上传,按型号接。
+gather 有个开关:`return_exceptions=True` 把异常当**返回值**收进列表而不是炸停整船——
+并发调多个 LLM 时常用(一个失败别连坐其他)。
 
-## 11.6 re:正则三板斧(06)
-
-正则 = 用**一行模式**描述"长什么样的文本"。
-文本清洗、日志提取、格式校验,全是它的主场(Agent 处理 LLM 输出也常用)。
-
-先懂 `r""`:原始字符串。`"\t"` 是真制表符,`r"\t"` 是反斜杠+t 两个字符——
-**写正则一律加 r 前缀**,别让 Python 先吃掉反斜杠。
-
-| 板斧 | 干什么 | 返回 |
-|------|--------|------|
-| `re.findall(r"\d+", s)` | 找出**所有**匹配 | 字符串列表 |
-| `re.search(r"\d+", s)` | 找**第一个**匹配 | 匹配对象(`.group()` 取文本);找不到 → None |
-| `re.sub(r"\d", "*", s)` | **全部替换** | 新字符串 |
-
-常用符号:`\d` 数字、`\w` 单词字符(字母数字下划线)、`\s` 空白、`.` 任意字符、`+` 一个或多个。
+**超时**(Agent 开发刚需——LLM 可能卡住):
 
 ```python
-import re
-order = "订单 1001 和 1002,共 2 件,实付 88.5 元"
-re.findall(r"\d+", order)   # ['1001', '1002', '2', '88', '5'] ← 字符串!要数字自己 int()
-re.sub(r"\d", "*", order)   # 订单 **** 和 ****,共 * 件,实付 **.* 元
+async def main():
+    try:
+        async with asyncio.timeout(3):      # 3 秒干不完就掐
+            await some_slow_thing()
+    except TimeoutError:
+        print("超时收工")                    # Python 3.11+;3.10 用 wait_for
 ```
 
-注意 findall 给的是**字符串列表**——要数字自己 `int()` 转换
-(input 永远 str,同款道理)。
+3.10 的老写法:`await asyncio.wait_for(coro, timeout=3)`——两种都认得。
 
-## 11.7 timeit:别猜,要测(07)
+## 11.7 深一层:await 到底让不让位?(06)
 
-问题:查"9999 在不在 10000 个数里",列表和集合谁快?
+11.2/11.3 说"await = 暂停点、让位"——那是**简化版**。你现在已经见过 gather、Task、
+异常了,可以上精确版了。一句话:**`await` 不保证让位,它只是"可能的暂停点"**。
+
+### await 的真实含义:驱动执行,直到"真等待"或"跑完"
+
+`await x` 的本质是**驱动 x 执行**,结果二选一:
+
+1. **链条深处有东西真的在等**——一个还没完成的 Future 从链条深处冒上来
+   → 整条链在这里挂起,调度员去跑别人(这才是"让位")
+2. **x 一路跑到底完成了**——直接拿返回值,**全程没让位,调度员靠边站**
+
+谁会把 Future 冒上来?**真在等外界的东西**:`asyncio.sleep` 的定时器、
+网络 I/O、还没完成的 Task……await 链像**一根直通的管子**,
+只有这些"真等待"才是闸口:
 
 ```python
-import timeit
-xs = list(range(10000))
-ss = set(xs)
-t_list = timeit.timeit(lambda: 9999 in xs, number=1000)
-t_set  = timeit.timeit(lambda: 9999 in ss, number=1000)
+async def deep():
+    await asyncio.sleep(1)     # ← 真闸口在这:定时器 Future 从这冒上来
+    return 42
+
+async def middle():
+    return await deep()        # ← 只是"接力执行",自己不是暂停点!
+
+result = await middle()        # main 只在 deep 的 sleep 处挂起过一次
 ```
 
-实测集合快上千倍:列表查成员 = 从头扫到尾;集合 = 哈希表直查
-(ch05 埋的伏笔在此收线)。**用法观:先跑通,再谈快;要谈快,先 timeit。**
+06 示例①用时间戳证明了这件事:`middle:开跑` 和 `deep:开跑` 是**同一瞬间**打出来的——
+`await middle()` 那一行根本没停,一路接力到 sleep 才真挂起。
 
-## 11.8 第三方库:pip 装的外接电池(08)
-
-标准库管"通用弹药",第三方库管"专业装备"——`pip install 库名` 装进
-site-packages,import 规则和 ch09 一模一样。本节是**盘点认脸**,
-用到哪个装哪个;`08_py_libraries.py` 装了的真跑一手、没装的友好提示,
-**全没装也能跑通**。
-
-### 网络请求
-
-| 库 | 一句话 | 为什么学 |
-|----|--------|----------|
-| `requests` | HTTP 请求事实标准:`requests.get(url)` 一行拿网页 | 爬虫/调 API 的入门第一站 |
-| `httpx` | requests 的现代继任者,**原生支持 async** | Agent 框架的底层常客,ch10 会用 |
+### 反面实锤:await 一个"从不让位"的协程
 
 ```python
-import requests
-r = requests.get("https://api.github.com", timeout=10)
-print(r.status_code)   # 200
-print(r.json())        # JSON 响应直接变 dict——ch06 的 json.load 思路
+async def busy(n):
+    total = 0
+    for i in range(n):         # 纯 CPU,零 await——没有任何"真等待"
+        total += i
+    return total
+
+await busy(20_000_000)         # 语法完全合法!但它一口气跑到底……
 ```
 
-### 数据验证:pydantic(Agent 开发刚需)
+后果:执行期间**调度员被饿死**,其他任务全部停摆——06 示例②里,
+心跳协程在 busy 运行的近 1 秒里一声没吭,一换回 `asyncio.sleep` 立刻复活。
+这也从底层解释了 11.3 的两条老话:
+- `time.sleep` 为什么是灾难:它压根不走协程链条,连 Future 都没有,直接卡死线程;
+- 异步为什么只救 I/O 密集:CPU 密集的活,就算包进协程、await 得再标准,
+  也没有真等待可冒,照样饿死调度员。
 
-用**类**给数据立规矩(ch08 的类,加上自动类型转换和校验):
+### await 后面能接什么:可等待对象(Awaitable)三兄弟
+
+凡是实现了 `__await__` 方法的对象都是可等待对象,共三兄弟:
+
+| 可等待对象 | 是什么 | await 它会发生什么 |
+|---|---|---|
+| 协程对象 | 调用协程函数的产物 | 接力执行函数体,到深处的真闸口才挂起 |
+| Task | `create_task` 包出来的、已在排班的任务 | **没干完**→挂起等它;**已干完**→秒拿结果,不让位 |
+| Future | 异步操作结果的**占位对象**(11.8 专题解剖) | 没好→挂起;好了→秒拿(Task 是它的子类) |
+
+注意 Task 那一行:await 已完成的 Task **不让位**——又一个"可能暂停"的实锤。
+(自己写 `__await__` 定制 awaitable?认个脸就行,那是框架作者的事。)
+
+> **Agent 场景预警(ch12)**:async def 里的每一行都在花"调度员的独占时间"。
+> 长活别硬扛——CPU 密集丢给 `asyncio.to_thread`(认个脸),
+> 或拆碎步骤、中途 `await asyncio.sleep(0)` 主动让一次位。
+
+## 11.8 Future:异步操作结果的占位对象(07)
+
+11.7 说"让位 = 链条深处冒上来一个还没完成的 Future"。这个 Future 到底是什么?
+一句话定义:**它是一个"现在还没有、将来会有"的值的容器——异步操作结果的占位对象。**
+
+### 定义与状态机
+
+Future 创建时是空的(PENDING),将来被填入值或异常,翻转为 DONE。
+整个生命周期只有三条路:
+
+```
+PENDING ──set_result(v)────→ DONE(值=v;await 它 → 拿到 v)
+PENDING ──set_exception(e)─→ DONE(异常=e;await 它 → 原样抛出 e,ch07 型号照接)
+PENDING ──cancel()─────────→ CANCELLED(await 它 → 抛 CancelledError)
+```
+
+常用 API:`fut.done()` 查好了没;`fut.result()` 取值——⚠️ **PENDING 时调用
+直接抛 InvalidStateError**,它不是"阻塞着等",是"没好就别拿";
+老式回调风格还有 `fut.add_done_callback(fn)`(认个脸,async 之前的写法)。
+
+### 关键认知:盒子自己不会变好
+
+**必须有人调用 `set_result` 填盒**。这是 Future 和普通变量最大的不同:
+变量是你现在赋值它才有值,Future 是"别人将来填"的容器——它把"还没发生的结果"
+变成一个可以被**传递、被等待、被填充**的一等公民。
+
+谁来填?应用代码几乎从不手工造 Future,**填盒的都是"外界/循环机器"**:
+
+| 场景 | 谁填盒 |
+|---|---|
+| `asyncio.sleep(2)` | 循环的定时器到点 → 回调替你 set_result |
+| 网络 I/O | 数据到达 → 传输层回调 → set_result |
+| `asyncio.to_thread(...)` | 线程里的活干完 → set_result |
+| Task | **协程跑完,Task 自己填自己**(见下) |
+
+### 解剖 asyncio.sleep:它只是个"等盒子的普通协程"
+
+把 sleep 的源码骨架摆出来(简化),你会发现"暂停"没有任何魔法:
 
 ```python
-from pydantic import BaseModel
-
-class City(BaseModel):
-    name: str
-    population: int      # 声明类型,pydantic 替你把守
-
-c = City(name="杭州", population="1200")   # "1200" 自动转成 int!
-City(name="杭州", population="很多")        # → ValidationError,当场挡下
+async def sleep(delay, result=None):
+    if delay <= 0:
+        await __sleep0()                    # sleep(0):立刻让一次位
+        return result                       #  (内部是个裸 yield,课程后面再拆)
+    fut = loop.create_future()              # ① 造占位盒
+    loop.call_later(delay, fut.set_result, result)
+                                            # ② 登记闹钟:到点有人替我填盒
+    return await fut                        # ③ 等盒:没好挂起,填了醒来拿值
 ```
 
-LLM 返回的 JSON 结构对不对,靠它把关——**ch12 整章都在用它**,
-这里先见个面。
+**sleep 的"暂停能力"完全来自 Future。** 它不是语法魔法,只是一个
+"等盒子被填"的普通协程——你自己也能造一套(07 示例:一个"送货员"
+睡 0.5 秒后 set_result,await 盒子的 main 立刻醒来拿到值)。
 
-### 开发体验与工程配套
+### Task 和 Future 的精确关系
 
-| 库 | 一句话 |
-|----|--------|
-| `rich` | 终端排版师:彩色/表格/进度条,调试输出立刻清爽 |
-| `python-dotenv` | 配置进 `.env` 文件不进代码:`load_dotenv()` + `os.getenv('API_KEY')` |
-| `openpyxl` | 直接读写 .xlsx 表格 |
+`Task 是 Future 的子类`(class Task(Future))——一句话分清两兄弟:
 
-### 数据三件套(只报到,用到再学)
+| | 谁执行代码 | 谁填盒 |
+|---|---|---|
+| **Future(被动盒)** | 不执行任何代码 | 必须**别人**来 set_result |
+| **Task(主动盒)** | 事件循环替它**跑包着的协程** | 跑完后**自己给自己 set_result** |
 
-| 库 | 一句话 |
-|----|--------|
-| `numpy` | 多维数组与数值计算,pandas 的地基 |
-| `pandas` | 表格数据 DataFrame,Excel 杀手 |
-| `matplotlib` | 画图:折线/柱状/散点一行出图 |
+所以 `create_task` 返回的东西两头通吃:既是"进行中的活"(11.5),
+又是"将来的结果盒"(本节)。`gather` 的返回值也是 Future——
+一个"等里面全部干完才被填入结果列表"的**聚合盒**。
 
-### 更多常用库速查(知道有这号人即可)
+### 两个精确细节(07 示例里都能看到)
 
-| 库 | 干什么 |
-|----|--------|
-| `flask` / `fastapi` | 写 Web 服务/HTTP API(fastapi 原生 async + 自带 pydantic) |
-| `click` / `typer` | 写命令行工具(参数解析不用手撸 sys.argv) |
-| `python-docx`、`pypdf` | Word / PDF 文件处理 |
-| `pillow` | 图片处理(缩放/裁剪/格式转换) |
-| `pytest` | 更强的测试框架(本项目的轻量 runner 升级版) |
-| `loguru` | 日志:print 的正经继任者 |
+1. `set_result` **不会立刻打断别人**:它只是把等待者登记为"能跑了",
+   真正切换要等当前代码让位。所以 07 示例里"送货员"填完盒还能先把自己
+   那行 print 打完,main 才醒来。
+2. 没人填的盒子会**等到天荒地老**——这也是 11.6 的 `asyncio.timeout`
+   存在的理由之一。
 
-### 装库三律
+## 11.9 和 Agent 的连接(ch12 预告)
 
-1. 装法:`pip install 库名`(终端里跑,不是 Python 代码里)
-2. **密钥永远不进代码库**——.env + python-dotenv,第一课就守规矩
-3. 装之前先 pip list 看看是不是已经有了
+你现在已具备读懂真实框架代码的全部语法。pydantic-ai 的两兄弟:
 
-## 11.9 漫游地图:下一批标准库景点(自学预告)
+```python
+result = agent.run_sync("你好")            # 同步版:内部替你跑事件循环
+result = await agent.run("你好")           # 异步版:并发场景用这个
+```
 
-| 模块 | 一句话 | 什么时候去 |
-|------|--------|------------|
-| `itertools` | 迭代器乐高(排列/组合/无限流) | 玩数据管道时 |
-| `shutil` | 文件手术刀(复制/移动/删文件夹树) | 想批量操作文件时 |
-| `zipfile` | 压缩包读写 | 打包文件时 |
-| `hashlib` | 文件指纹(哈希) | 想校验"内容没被改过"时 |
-| `pprint` | 打印美化师 | dict 印出来太乱时 |
-| `os` | pathlib 的老前辈 | 读老代码遇到 os.path 时 |
-| `json` | ch06 老朋友 | 存结构化数据时 |
-| `functools` | lru_cache 等:给函数加 buff | 想缓存函数结果时 |
+Agent 的真实并发场景(下一章你会亲眼见到):
 
-漫游的终点不是"全逛完",是养成条件反射:
-**这活儿,标准库是不是已经有了?**
+```python
+results = await asyncio.gather(
+    weather_agent.run("杭州天气?"),
+    news_agent.run("今日头条?"),
+    calc_agent.run("1+1=?"),
+)
+```
+
+三个模型同时调,总耗时 = 最慢那个——**这就是 11.4 的 gather**,
+只不过协程里 await 的不是 sleep,是网络请求。**asyncio 是 Agent 的腿。**
 
 ## 11.10 小结与自测
 
-一句话:**标准库 = 自带电池,第三方库 = pip 外接电池;
-Counter/defaultdict 替你写完 ch05 的计数/收集;seed 让随机可复现;
-路径是对象(. 取属性,/ 拼路);日期是对象(相减得 timedelta);
-strftime 出、strptime 进;正则三板斧 findall/search/sub;别猜要测先 timeit。**
+一句话:**async def 造票,await 兑票并驱动执行;让位只发生在链条深处有"真等待"
+(Future 冒上来)的时候——没有就一口气跑到底,调度员被饿死;
+可等待对象三兄弟:协程对象/Task/Future;Future=异步操作结果的占位盒
+(PENDING→set_result/set_exception→DONE,Task 是"会自己跑、自己填"的子类);
+asyncio.run 全程序点火一次;gather 同发多票、create_task 单张提前点火
+(总时长≈最慢任务);协程里睡觉必须 asyncio.sleep(time.sleep 会卡死调度员);
+异常照常按型号接,超时用 asyncio.timeout;
+异步省的是"等待被重叠",CPU 密集帮不上忙——包进协程也救不了。**
 
-自测七问(合上文件先复述,再翻回对照):
+自测九问(合上文件先复述):
 
-1. Counter 替你写完了 ch05 的哪个模式?`most_common(2)` 返回什么结构?(11.2)
-2. `random.randint(1, 6)` 和 `range(1, 7)`:谁两端都含,谁含头不含尾?(11.4)
-3. shuffle 和 sample,谁动原件?谁的返回值能用?(11.4)
-4. 两个 date 相减得到什么?strftime 和 strptime,哪个是日期→字符串?(11.5)
-5. `re.findall(r"\d+", s)` 返回的列表里是数字还是字符串?(11.6)
-6. requests / httpx 的分工是什么?为什么说 httpx 是 ch10 的伏笔?(11.8)
-7. pydantic 的 `BaseModel` 替你把守什么?哪一章会把它当主角?(11.8)
+1. 调用 `async def` 函数会发生什么?怎么才真正执行?(11.2)
+2. 协程函数和协程对象,哪个是菜谱、哪个是票?票能兑两次吗?(11.2)
+3. `await` 写在普通函数里行吗?`time.sleep` 和 `await asyncio.sleep` 在协程里的本质区别?(11.2/11.3)
+4. 三个 2 秒任务:顺序 await 总耗时?gather 总耗时?为什么?(11.4)
+5. gather 的结果顺序按什么排?`create_task` 和直接 `await` 的差别是什么?(11.4/11.5)
+6. gather 默认一颗雷炸全船,怎么让异常"当返回值收进列表"?(11.6)
+7. `await` 一定让位吗?什么时候例外?可等待对象有哪三兄弟?(11.7)
+8. 为什么把大循环包进协程也快不了?要快该怎么办?(11.7)
+9. Future 是什么?谁负责填盒?Task 和 Future 什么关系?await 一个装了异常的盒子会怎样?(11.8)
 
 ## 动手运行
 
 ```bash
-python ch11/01_battery_check.py        # 工具带盘点 + sys.modules 记账现场
-python ch11/02_collections.py
-python ch11/03_filesystem.py           # 会真的列出本章全部 .py 文件
-python ch11/04_random_playground.py    # 上半段每次输出不同(seed 段除外)——这不是 bug
-python ch11/05_datetime_stats.py
-python ch11/06_regex_intro.py
-python ch11/07_timeit_race.py          # 数字每次会变,量级不会
-python ch11/08_py_libraries.py         # 装了就真跑一手,没装也跑得通
+python ch11/01_sync_vs_async.py     # 煮两壶水:时间线对比(计时输出)
+python ch11/02_async_basics.py      # 三件套最小演示 + 调用不执行的坑
+python ch11/03_gather_race.py       # gather 并发实测:3 个任务 2 秒 vs 6 秒
+python ch11/04_task_demo.py         # Task:提前点火,等待里干活
+python ch11/05_timeout_errors.py    # 超时 + 异常:Agent 场景预演
+python ch11/06_await_truth.py       # await 的真相:可能暂停点 + 被饿死的心跳
+python ch11/07_future_box.py        # Future:手工造盒 + 送货员填盒
 ```
 
 ## 练习
 
-`exercises.py` 共 7 题。**import 区继续由你自己建**(ch09 规矩)——
-骨架里一行 import 都没有,每题 TODO 都标了需要什么模块。
-交卷前扫 import 区三查(9.7 的仪式)。
-
-做完在项目根目录运行:
+`exercises.py` 共 7 题:练习文件里**不许**随手 asyncio.run——
+想亲手点火,写进文件底部的"点火台"(守卫内,被导入时不执行)。
+其余照旧。交卷前照例扫 import 区三查。
 
 ```bash
-python -m ch11.test_exercises
+python -m ch11.test_exercises    # 项目根目录运行
 ```
 
-下一章预告:**ch12 Agent 开发入门**——pydantic 打底、pydantic-ai 上手,
-把 ch10 的异步和本章的电池全部用上。
+下一章预告:**ch12 主流 Agent 开发框架**——pydantic 打底、pydantic-ai 上手,
+你刚学的 gather 就要上场并发调模型了。

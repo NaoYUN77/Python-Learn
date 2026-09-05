@@ -1,4 +1,4 @@
-"""07_timeit_race.py — timeit 竞速 — 别猜,要测。
+"""07_timeit_race.py — timeit 竞速:别猜,要测。
 
 运行:python ch10/07_timeit_race.py
 问题:查"9999 在不在 10000 个数里",列表和集合谁快?

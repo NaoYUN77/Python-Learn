@@ -15,7 +15,8 @@ ch09 你拿到了"进入标准库的钥匙"(import 三姿势 + 模块对象),
 2. **每到一个景点,先问连接**——它替你手写过哪个模式?(Counter ↔ ch05 计数)
 3. **import 区三查铁律继续生效**——幽灵七连的账还挂着(9.7 的仪式)
 
-本章路线图:五个标准库景点 → 第三方库盘点 → Agent 开发库盘点 → 迷你 Agent Loop。
+本章路线图:五个标准库景点 → 正则 → 测速 → 第三方库盘点。
+(同步与异步在下一章 ch11;Agent 开发库在 ch12,pydantic 在那章是主角。)
 
 | 景点 | 模块 | 一句话 | 和旧知识的连接 |
 |------|------|--------|----------------|
@@ -27,13 +28,12 @@ ch09 你拿到了"进入标准库的钥匙"(import 三姿势 + 模块对象),
 | 正则入门 | re | 一行模式描述"长什么样的文本" | ch06 字符串处理 |
 | 测速 | timeit | 别猜,要测 | ch05 集合的伏笔 |
 | 第三方库 | pip 装的 | 自带电池之外的外接电池 | 本章新内容 |
-| Agent 库 | AI SDK 概念体系 | Agent 开发的"水电煤"地图 | ch08 类、ch11 异步 |
 
 ## 10.1 开场:你早就在用标准库了(01)
 
 `01_battery_check.py` 先盘一遍工具带:json、math、string、datetime、
 collections、sys——**6 个老朋友**都现场演示一手。
-再当场演示 sys.modules 记账本变厚( ch09 9.1 的知识落地)。
+再当场演示 sys.modules 记账本变厚(ch09 9.1 的知识落地)。
 
 ## 10.2 collections:你手写过的,它都写好了(02)
 
@@ -69,7 +69,8 @@ print(dict(groups))             # {'a': ['apple', 'avocado'], 'b': ['banana']}
 ```
 
 `defaultdict(list)` 读作"一个值默认是空列表的字典"——括号里放什么类型,
-缺键就自动造什么,所以叫**缺键工厂**。
+缺键就自动造什么,所以叫**缺键工厂**。同理 `defaultdict(int)`(缺键给 0,适合计数)、
+`defaultdict(str)`(缺键给空串)。
 
 ### deque:两头都能进出的队列(认个脸即可)
 
@@ -83,7 +84,7 @@ print(first, list(line))   # 甲 ['乙', '丙', '丁']
 
 `list.pop(0)` 每次要把后面全部元素往前搬一遍;`popleft()` 不用。
 排队、任务列表这类"先进先出"场景直接上 deque,用到再深究。
-(预告:Agent 框架的"消息历史"经常就是 deque。)
+(预告:Agent 框架的"消息历史"经常就是 deque——ch12 会见。)
 
 ### 对照表:手写模式 → 标准库一行版
 
@@ -140,6 +141,14 @@ print(p.read_text(encoding="utf-8"))    # 你好,标准库!
 两行顶 ch06 的 open → 读写 → close。**小文件随手用;
 大文件、要逐行处理的,仍走 with open**——别把便捷门当正门。
 
+### 顺手记:dict 的 key 规矩(自学补丁)
+
+- **value 随便放**(任何对象);**key 必须不可变**——str/int/tuple 可以,
+  list/dict/set 不行(`TypeError: unhashable`)
+- 原因:dict 是哈希表,门牌号按内容算,内容能改门牌就废
+- 暗坑:`1 == 1.0 == True` 视为**同一个键**,互相覆盖
+- tuple 当 key 的经典用法:坐标查表 `{(3, 4): "东北角"}`
+
 ## 10.4 random:随机不等于不可控(04)
 
 ### 五件套
@@ -167,10 +176,16 @@ b = [random.randint(1, 6) for _ in range(3)]
 print(a, b)      # 两次完全一样!同一种子 → 同一序列
 ```
 
-**同一种子 → 同一序列**。这把钥匙解决两个大问题:
+**随机数是伪随机**:从种子按固定算法走,路线完全确定。
+`seed(n)` = 把随机源的进度条拨到 n 号位置(存档),再 seed 同一个数 = 读档。
+数字本身无含义(42 是《银河系漫游指南》的梗),**同一种子 → 同一序列**才是重点。
+
+这把钥匙解决两个大问题:
 
 - 测试:测试里 seed 一下,随机函数的结果就能断言了(练习 3 就这么测)
 - 调试:bug 在随机场景出现,seed 定住现场,一步一步复现
+
+反过来,**抽奖/发牌要不可预测 → 不 seed**。
 
 ## 10.5 datetime:日期是对象,能加减能比较(05)
 
@@ -263,6 +278,11 @@ t_set  = timeit.timeit(lambda: 9999 in ss, number=1000)
 实测集合快上千倍:列表查成员 = 从头扫到尾;集合 = 哈希表直查
 (ch05 埋的伏笔在此收线)。**用法观:先跑通,再谈快;要谈快,先 timeit。**
 
+顺带复习 lambda:这里的 `lambda: 9999 in xs` 是**零参数**小函数——
+原料(9999、xs)都在外面备好了,闭包直接看得到;它只是把"要测的代码"
+打包递给 timeit。⚠️ 别写成 `timeit.timeit(9999 in xs, ...)`:那是先算完
+把 True/False 传进去,timeit 测了个寂寞。
+
 ## 10.8 第三方库:pip 装的外接电池(08)
 
 标准库管"通用弹药",第三方库管"专业装备"——`pip install 库名` 装进
@@ -299,7 +319,8 @@ c = City(name="杭州", population="1200")   # "1200" 自动转成 int!
 City(name="杭州", population="很多")        # → ValidationError,当场挡下
 ```
 
-LLM 返回的 JSON 结构对不对,靠它把关——Agent 开发里它无处不在。
+LLM 返回的 JSON 结构对不对,靠它把关——**ch12 整章都在用它**,
+这里先见个面。
 
 ### 开发体验与工程配套
 
@@ -323,7 +344,7 @@ LLM 返回的 JSON 结构对不对,靠它把关——Agent 开发里它无处不
 |----|--------|
 | `flask` / `fastapi` | 写 Web 服务/HTTP API(fastapi 原生 async + 自带 pydantic) |
 | `click` / `typer` | 写命令行工具(参数解析不用手撸 sys.argv) |
-| `openpyxl` 之外:`python-docx`、`pypdf` | Word / PDF 文件处理 |
+| `python-docx`、`pypdf` | Word / PDF 文件处理 |
 | `pillow` | 图片处理(缩放/裁剪/格式转换) |
 | `pytest` | 更强的测试框架(本项目的轻量 runner 升级版) |
 | `loguru` | 日志:print 的正经继任者 |
@@ -334,94 +355,7 @@ LLM 返回的 JSON 结构对不对,靠它把关——Agent 开发里它无处不
 2. **密钥永远不进代码库**——.env + python-dotenv,第一课就守规矩
 3. 装之前先 pip list 看看是不是已经有了
 
-## 10.9 Agent 开发常用库:概念地图(09)
-
-> 主要参照 [Vercel AI SDK](https://ai-sdk.dev/docs/introduction) 的概念体系
-> (统一 Provider、Tool Calling、Structured Data、Streaming、Agent Loop、
-> Memory、Subagent),对应到 Python 生态的各家库。
-> 本节先**认脸**;`09_agent_libraries.py` 用纯标准库搭了个 30 行迷你 Agent Loop,
-> 装任何框架之前先把那个跑通——所有框架的内核都是它。
-
-### 先建立概念词表(框架文档里的词,提前认识)
-
-| AI SDK 概念 | 一句话 | Python 侧对应 |
-|-------------|--------|---------------|
-| Provider / 统一模型接口 | 换模型只换一个参数 | openai / anthropic / litellm 等 SDK |
-| Tool Calling | 给模型一排工具,它点名"调哪个+参数" | 各框架的 tools/tool 参数 |
-| Structured Data | 让模型输出带类型校验的结构化 JSON | pydantic 模型 |
-| Agent Loop | 模型↔工具循环直到给出最终回答 | 框架的 agent 核心循环 |
-| Loop Control | 循环上限/停止条件,防无限调工具 | max_steps / max_turns |
-| Memory | 对话历史与状态管理 | messages 列表 / 框架的 memory |
-| Streaming | 一边生成一边输出 | `stream=True` / async 迭代 |
-| Subagent / Handoff | 主代理把任务转交子代理 | openai-agents 的 handoffs |
-| MCP | 工具接入的开放标准,"AI 界的 USB-C" | `mcp` 包 |
-
-### 第一梯队:模型接口层(怎么跟 LLM 说话)
-
-| 库 | 一句话 |
-|----|--------|
-| `openai` | OpenAI 官方 SDK;**很多国产模型都提供 OpenAI 兼容接口**,学会一个通吃一片 |
-| `anthropic` | Claude 官方 SDK |
-| `zai-sdk` | 智谱 GLM 官方 SDK |
-| `google-genai` | Google Gemini 官方 SDK |
-| `litellm` | 一个接口调 100+ 家模型,统一成 OpenAI 格式 |
-
-共同点:你写 prompt,它管 HTTP、重试、流式;换模型只换一个参数。
-
-### 第二梯队:编排框架层(把模型/工具/记忆拼成 Agent)
-
-| 库 | 一句话 | 适合 |
-|----|--------|------|
-| `langchain` | 最老牌的 LLM 工具箱:组件多、集成全 | 快速原型、接各种现成集成 |
-| `langgraph` | LangChain 家的**有状态流程图**:循环/分支/人工审批 | 复杂、可控的 Agent 工作流(当前主流) |
-| `openai-agents` | OpenAI 出的轻量框架:handoffs + guardrails | 想要官方出品、抽象少 |
-| `crewai` | 角色扮演式多智能体:定角色/目标,组队干活 | "一个团队"式的多 Agent 协作 |
-| `autogen` | 微软出品:多 Agent 对话式协作(并入 Microsoft Agent 框架) | 研究型/对话式多 Agent |
-| `pydantic-ai` | 类型安全的 Agent 框架(pydantic 作者出品) | 喜欢强类型、显式数据流 |
-
-**怎么选**:第一个 Agent 用官方 SDK + pydantic 手搭(理解内核);
-要复杂流程上 langgraph;要多角色协作看 crewai/autogen;
-喜欢强类型看 pydantic-ai。框架选型远不如吃透 Agent Loop 重要——**内核都会了,框架只是加料**。
-
-### 第三梯队:支撑件层(Agent 周边的水电煤)
-
-| 库 | 一句话 |
-|----|--------|
-| `mcp` | Model Context Protocol:Anthropic 开的工具接入标准,一次接入处处可用 |
-| `pydantic` | 结构化输出把关:LLM 吐的 JSON 合不合格,它说了算 |
-| `httpx` | 异步 HTTP:所有 SDK 调 API 的底层常客 |
-| `tiktoken` | 数 token:上下文窗口花了多少,心里有数 |
-| `rich` | Agent 的思考过程打印出来好看又好读 |
-| `python-dotenv` | 密钥进 .env 不进代码 |
-| `chromadb` / `faiss` | 向量数据库:记忆检索(RAG)的仓库 |
-
-### 迷你 Agent Loop:30 行看穿所有框架(09 示例核心)
-
-```python
-def agent_loop(user_text, max_steps=3):
-    history = [{"user": user_text}]               # 记忆
-    for step in range(max_steps):                 # 循环上限=安全带
-        decision = fake_llm(history)              # ① 问模型(真项目=API 调用)
-        if "reply" in decision:                   # ② 模型给最终回答 → 收工
-            return decision["reply"]
-        result = get_weather(**decision["args"])  # ③ 执行模型点名的工具
-        history.append({"tool": decision["tool"],
-                        "tool_result": result})   # ④ 结果记进记忆,喂回模型
-    return "(步数用尽,强制收工)"
-```
-
-四步循环:**问模型 → (它要工具就执行) → 结果进记忆 → 再问模型**,
-直到模型给出最终回答。LangGraph/CrewAI/pydantic-ai 都在给这个循环加料:
-加状态图、加多角色、加类型校验、加人工审批——**内核不变**。
-
-### 学习路线(下一步)
-
-1. **ch11 的 asyncio**:真实框架里 API 调用全是 async 的——先修课
-2. 挑一个官方 SDK(`openai` / `zai-sdk`)跑通第一句对话(要 API key)
-3. 用 pydantic 给"LLM 返回的 JSON"立规矩(结构化输出)
-4. 手搭 Agent Loop(09 示例已是完整骨架),再回头看框架文档——每个词都认识
-
-## 10.10 漫游地图:下一批标准库景点(自学预告)
+## 10.9 漫游地图:下一批标准库景点(自学预告)
 
 | 模块 | 一句话 | 什么时候去 |
 |------|--------|------------|
@@ -437,15 +371,14 @@ def agent_loop(user_text, max_steps=3):
 漫游的终点不是"全逛完",是养成条件反射:
 **这活儿,标准库是不是已经有了?**
 
-## 10.11 小结与自测
+## 10.10 小结与自测
 
-一句话:**标准库 = 自带电池,第三方库 = pip 外接电池,Agent 库 = 拼电池的手艺;
+一句话:**标准库 = 自带电池,第三方库 = pip 外接电池;
 Counter/defaultdict 替你写完 ch05 的计数/收集;seed 让随机可复现;
 路径是对象(. 取属性,/ 拼路);日期是对象(相减得 timedelta);
-strftime 出、strptime 进;正则三板斧 findall/search/sub;别猜要测先 timeit;
-pydantic 给数据立规矩;Agent = 问模型→调工具→结果进记忆→再问,循环到答。**
+strftime 出、strptime 进;正则三板斧 findall/search/sub;别猜要测先 timeit。**
 
-自测八问(合上文件先复述,再翻回对照):
+自测七问(合上文件先复述,再翻回对照):
 
 1. Counter 替你写完了 ch05 的哪个模式?`most_common(2)` 返回什么结构?(10.2)
 2. `random.randint(1, 6)` 和 `range(1, 7)`:谁两端都含,谁含头不含尾?(10.4)
@@ -453,8 +386,7 @@ pydantic 给数据立规矩;Agent = 问模型→调工具→结果进记忆→�
 4. 两个 date 相减得到什么?strftime 和 strptime,哪个是日期→字符串?(10.5)
 5. `re.findall(r"\d+", s)` 返回的列表里是数字还是字符串?(10.6)
 6. requests / httpx 的分工是什么?为什么说 httpx 是 ch11 的伏笔?(10.8)
-7. pydantic 的 `BaseModel` 替你把守什么?为什么它是 Agent 开发刚需?(10.8)
-8. 说出迷你 Agent Loop 的四步循环;max_steps 防的是什么?(10.9)
+7. pydantic 的 `BaseModel` 替你把守什么?哪一章会把它当主角?(10.8)
 
 ## 动手运行
 
@@ -467,7 +399,6 @@ python ch10/05_datetime_stats.py
 python ch10/06_regex_intro.py
 python ch10/07_timeit_race.py          # 数字每次会变,量级不会
 python ch10/08_py_libraries.py         # 装了就真跑一手,没装也跑得通
-python ch10/09_agent_libraries.py      # 零依赖!迷你 Agent Loop 直接跑
 ```
 
 ## 练习
@@ -481,3 +412,6 @@ python ch10/09_agent_libraries.py      # 零依赖!迷你 Agent Loop 直接跑
 ```bash
 python -m ch10.test_exercises
 ```
+
+下一章预告:**ch11 同步与异步编程**——asyncio 入门,
+真实 Agent 框架里 API 调用全是 async 的,这是直接前置。

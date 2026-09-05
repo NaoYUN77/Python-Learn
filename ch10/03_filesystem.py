@@ -56,7 +56,6 @@ for f in py_files:
 # sorted(os.listdir(here))[:4] = ['01_battery_check.py', '02_collections.py', ...]
 #   ↑ os.listdir 给字符串列表;pathlib 的 glob 给 Path 对象:
 #
-# here 下的 .py 文件(共 11 个):
+# here 下的 .py 文件(共 12 个):
 #   01_battery_check.py      主干 '01_battery_check'      后缀 '.py'
-#   02_collections.py        主干 '02_collections'        后缀 '.py'
-#   ...(03~09 / answers / exercises / test_exercises 同理)
+#   ...(其余同理)

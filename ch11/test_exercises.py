@@ -2,100 +2,146 @@
 
 运行(在项目根目录执行):python -m ch11.test_exercises
 如果你通过了全部测试,会在终端看到 "恭喜!全部通过 🎉"。
+
+小知识:测试里所有 asyncio.run(...) 都是在替你"兑票"——
+你的协程函数光调用不会执行,这是本章第一课。
 """
 
 from . import exercises
 
-import random
-import shutil
-import tempfile
-from pathlib import Path
-from string import ascii_letters, digits
+import asyncio
+import inspect
+import time
 
 
-def test_most_common_words():
-    r = exercises.most_common_words("py go py go go cat", 2)
-    assert r == [("go", 3), ("py", 2)], f"应为 [('go', 3), ('py', 2)],实际 {r!r}"
-    r = exercises.most_common_words("a a a", 1)
-    assert r == [("a", 3)], f"只出现一个词,应为 [('a', 3)],实际 {r!r}"
-
-
-def test_group_by_first_letter():
-    r = exercises.group_by_first_letter(["apple", "banana", "avocado"])
-    assert r == {"a": ["apple", "avocado"], "b": ["banana"]}, (
-        f"应按首字母分组得到 {{'a': ['apple', 'avocado'], 'b': ['banana']}},实际 {r!r}"
+def test_make_tea():
+    assert inspect.iscoroutinefunction(exercises.make_tea), (
+        "make_tea 必须用 async def 定义(协程函数)——只差一个关键词!"
     )
-    r = exercises.group_by_first_letter([])
-    assert r == {}, f"空列表应返回空字典,实际 {r!r}"
-
-
-def test_roll_dice():
-    # 彩蛋:测试和 exercises 拿到的是【同一个】random 模块对象
-    #(sys.modules 记账,ch09 的知识)——所以这里的 seed 能管住你函数里的随机
-    random.seed(42)
-    r1 = exercises.roll_dice(5)
-    random.seed(42)
-    r2 = exercises.roll_dice(5)
-    assert r1 == r2, (
-        f"同一种子应得到同一序列——第一次 {r1},第二次 {r2}"
-        "(函数内部的随机调用要只由 n 决定,中途别加别的随机调用)"
-    )
-    assert len(r1) == 5, f"应掷 5 次,实际 {len(r1)} 次"
-    assert all(1 <= x <= 6 for x in r1), f"每颗都应在 1~6 之间(两端都含!),实际 {r1}"
-
-
-def test_py_files_in():
-    tmp = tempfile.mkdtemp()          # 测试自建临时文件夹,跑完就删
+    coro = exercises.make_tea()
     try:
-        for name in ["b.py", "a.py", "notes.txt", "c.py"]:
-            Path(tmp, name).write_text("# 临时文件", encoding="utf-8")
-        r = exercises.py_files_in(tmp)
-        assert r == ["a.py", "b.py", "c.py"], (
-            f"应返回按字母排序的 .py 文件名(不含 notes.txt),实际 {r!r}"
-            "(提示:Path(folder).glob('*.py') → 取 .name → sorted)"
+        assert type(coro).__name__ == "coroutine", (
+            f"调用协程函数应该只得到协程对象(票,还没执行!),"
+            f"实际得到 {type(coro).__name__}"
         )
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)   # 测试也讲卫生:临时文件夹收走
+        coro.close()   # 测试讲卫生:废票要作废,否则运行结束蹦 RuntimeWarning
+    r = asyncio.run(exercises.make_tea())
+    assert r == "🍵 茶泡好了", f"await 兑票之后应拿到返回值 '🍵 茶泡好了',实际 {r!r}"
 
 
-def test_days_between():
-    r = exercises.days_between(2026, 1, 1, 2026, 2, 1)
-    assert r == 31, f"2026-01-01 → 2026-02-01 应为 31 天,实际 {r!r}"
-    r = exercises.days_between(2024, 2, 1, 2024, 3, 1)
-    assert r == 29, f"2024 是闰年,2 月有 29 天,实际 {r!r}"
-    r = exercises.days_between(2026, 3, 1, 2026, 3, 1)
-    assert r == 0, f"同一天相减应为 0 天,实际 {r!r}"
-
-
-def test_exam_stats():
-    r = exercises.exam_stats([2, 4, 4, 10])
-    assert r == (5.0, 4.0), (
-        f"应为 (5.0, 4.0)——平均 20/4=5,中位数 (4+4)/2=4,实际 {r!r}"
+def test_nap():
+    assert inspect.iscoroutinefunction(exercises.nap), "nap 必须是 async def 函数"
+    t0 = time.perf_counter()
+    r = asyncio.run(exercises.nap(0.05))
+    elapsed = time.perf_counter() - t0
+    assert r == "睡了 0.05 秒", f"应返回 '睡了 0.05 秒'(f-string 拼秒数),实际 {r!r}"
+    assert elapsed >= 0.05, (
+        f"说好睡 0.05 秒,实际只过了 {elapsed:.3f} 秒——sleep 没生效?"
     )
-    r = exercises.exam_stats([7])
-    assert r == (7, 7), f"单元素:平均=中位数=7,实际 {r!r}"
 
 
-def test_gen_password():
-    pw = exercises.gen_password(8)
-    assert isinstance(pw, str), f"应返回字符串,实际 {type(pw).__name__}"
-    assert len(pw) == 8, f"密码长度应为 8,实际 {len(pw)}"
-    allowed = ascii_letters + digits
-    bad = [ch for ch in pw if ch not in allowed]
-    assert not bad, (
-        f"密码只能含大小写字母和数字,混进了 {bad!r}(提示:材料库 = ascii_letters + digits)"
+def test_boil_race():
+    durations = [0.08, 0.08, 0.08]
+    expected = ["壶1 的开水", "壶2 的开水", "壶3 的开水"]
+
+    r = asyncio.run(exercises.boil_serial(durations))
+    assert r == expected, f"排队版应返回 {expected},实际 {r!r}"
+
+    r = asyncio.run(exercises.boil_gather(durations))
+    assert r == expected, f"并发版应返回同样的列表 {expected},实际 {r!r}"
+
+    # 边界:没壶可烧,返回 []
+    assert asyncio.run(exercises.boil_serial([])) == [], "空列表应返回 [](边界!)"
+    assert asyncio.run(exercises.boil_gather([])) == [], "空列表应返回 [](边界!)"
+
+    # 计时对比:并发版要明显快于排队版
+    t0 = time.perf_counter()
+    asyncio.run(exercises.boil_serial(durations))
+    serial = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    asyncio.run(exercises.boil_gather(durations))
+    gather_t = time.perf_counter() - t0
+    assert gather_t < serial - 0.08, (
+        f"并发版({gather_t:.2f}s)应明显快于排队版({serial:.2f}s)——"
+        "gather 是同时点火,总耗时≈最慢那壶(0.08s),不是三壶之和(0.24s)"
     )
+
+
+def test_fetch_all():
+    sites = [("慢站", 0.12), ("中站", 0.06), ("快站", 0.02)]
+    t0 = time.perf_counter()
+    r = asyncio.run(exercises.fetch_all(sites))
+    elapsed = time.perf_counter() - t0
+    assert r == ["慢站 下载完成", "中站 下载完成", "快站 下载完成"], (
+        f"结果必须按【传入顺序】排列(先完成的快站不能插队!),实际 {r!r}"
+    )
+    assert elapsed < 0.19, (
+        f"三站应该同时下载,总耗时≈最慢的 0.12s,你用了 {elapsed:.2f} 秒"
+        "(是不是逐个 await 排队了?排队的话是总和 0.2s)"
+    )
+
+
+def test_cook_dinner():
+    t0 = time.perf_counter()
+    r = asyncio.run(exercises.cook_dinner())
+    elapsed = time.perf_counter() - t0
+    assert r == ("菜切好了", "汤炖好了"), (
+        f"应返回 ('菜切好了', '汤炖好了'),实际 {r!r}"
+    )
+    assert elapsed < 0.24, (
+        f"炖汤 0.2s + 切菜 0.05s = 0.25s,你用了 {elapsed:.2f} 秒——"
+        "汤要用 create_task 提前点火,切菜填进等待里,总耗时应 ≈ 0.2s"
+    )
+
+
+def test_oven_exceptions():
+    r = asyncio.run(exercises.check_oven(80))
+    assert r == "80 度正常", f"80 度应正常,实际 {r!r}"
+    r = asyncio.run(exercises.check_oven(100))
+    assert r == "100 度正常", f"边界!100 度算正常(>100 才算太高),实际 {r!r}"
+    raised = False
+    try:
+        asyncio.run(exercises.check_oven(120))
+    except ValueError as e:
+        raised = True
+        assert "120" in str(e), f"报错信息里应带上温度 120,实际 {e!r}"
+    assert raised, "120 度应 raise ValueError(大声失败,ch07),不能静默返回"
+
+    r = asyncio.run(exercises.safe_check([80, 120, 100]))
+    assert len(r) == 3, f"应返回 3 个结果(异常也算一个),实际 {r!r}"
+    assert r[0] == "80 度正常", f"正常结果应原样收进列表,实际 {r[0]!r}"
+    assert isinstance(r[1], ValueError), (
+        f"炸掉的应收成 ValueError 对象,实际 {type(r[1]).__name__}"
+        "(提示:gather 加 return_exceptions=True)"
+    )
+    assert r[2] == "100 度正常", f"边界值 100 度应正常,实际 {r[2]!r}"
+
+
+def test_run_tools():
+    tools = {"天气": 0.06, "计算": 0.02, "新闻": 0.1}
+    t0 = time.perf_counter()
+    r = asyncio.run(exercises.run_tools(tools))
+    elapsed = time.perf_counter() - t0
+    assert r == ["天气 查询完成", "计算 查询完成", "新闻 查询完成"], (
+        f"应按传入顺序返回三个工具的结果,实际 {r!r}"
+    )
+    assert elapsed < 0.17, (
+        f"工具应并发调用:总耗时≈最慢的新闻(0.1s),"
+        f"你用了 {elapsed:.2f} 秒(三个工具排队的话是总和 0.18s)"
+    )
+    assert asyncio.run(exercises.run_tools({})) == [], "没有工具应返回 [](边界!)"
 
 
 def run_all():
     tests = [
-        test_most_common_words,
-        test_group_by_first_letter,
-        test_roll_dice,
-        test_py_files_in,
-        test_days_between,
-        test_exam_stats,
-        test_gen_password,
+        test_make_tea,
+        test_nap,
+        test_boil_race,
+        test_fetch_all,
+        test_cook_dinner,
+        test_oven_exceptions,
+        test_run_tools,
     ]
     passed = 0
     for test in tests:
